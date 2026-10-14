@@ -1,0 +1,75 @@
+{
+  "name": "modelflare",
+  "displayName": "Modelflare",
+  "description": "Use every model available to your Modelflare Smart API Key in VS Code chat: GPT, Claude, Gemini and more.",
+  "version": "0.1.0",
+  "publisher": "modelflare",
+  "license": "MIT",
+  "author": "Havenbyte LLC",
+  "icon": "assets/icon.png",
+  "homepage": "https://modelflare.dev/sign-up?utm_source=vscode&utm_medium=plugin&utm_campaign=integrations",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/castaly-ai/modelflare-vscode"
+  },
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "modelflare",
+    "byok",
+    "language model",
+    "gpt",
+    "claude",
+    "gemini"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "modelflare",
+        "displayName": "Modelflare",
+        "managementCommand": "modelflare.manage"
+      }
+    ],
+    "commands": [
+      {
+        "command": "modelflare.manage",
+        "title": "%command.manage%",
+        "category": "Modelflare"
+      },
+      {
+        "command": "modelflare.refreshModels",
+        "title": "%command.refresh%",
+        "category": "Modelflare"
+      }
+    ],
+    "configuration": {
+      "title": "Modelflare",
+      "properties": {
+        "modelflare.baseUrl": {
+          "type": "string",
+          "default": "global",
+          "markdownDescription": "%config.baseUrl%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "@types/vscode": "1.104.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3"
+  }
+}

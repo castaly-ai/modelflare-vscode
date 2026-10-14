@@ -1,0 +1,5 @@
+{
+  "command.manage": "Manage Modelflare API Key",
+  "command.refresh": "Refresh Modelflare Models",
+  "config.baseUrl": "Modelflare base URL: `global` (https://modelflare.dev/v1, default), `china` (https://origin.modelflare.dev/v1), or a custom URL."
+}

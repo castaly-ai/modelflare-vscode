@@ -1,0 +1,9 @@
+**
+!dist/extension.js
+!assets/icon.png
+!package.json
+!package.nls.json
+!package.nls.zh-cn.json
+!README.md
+!LICENSE
+!CHANGELOG.md

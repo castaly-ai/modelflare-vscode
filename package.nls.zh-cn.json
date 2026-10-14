@@ -1,0 +1,5 @@
+{
+  "command.manage": "管理 Modelflare API Key",
+  "command.refresh": "刷新 Modelflare 模型列表",
+  "config.baseUrl": "Modelflare Base URL：`global`（https://modelflare.dev/v1，默认）、`china`（https://origin.modelflare.dev/v1），或自定义地址。"
+}
