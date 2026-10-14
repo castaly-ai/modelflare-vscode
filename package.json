@@ -1,8 +1,8 @@
 {
-  "name": "modelflare",
+  "name": "modelflare-vscode",
   "displayName": "Modelflare",
   "description": "Use every model available to your Modelflare Smart API Key in VS Code chat: GPT, Claude, Gemini and more.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "modelflare",
   "license": "MIT",
   "author": "Havenbyte LLC",
@@ -63,7 +63,8 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "package": "npm run build && vsce package --no-dependencies"
+    "package": "npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
     "@types/node": "25.9.1",
