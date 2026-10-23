@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+- Report each model's context, output, tool-calling, and vision capabilities instead of using one fixed token budget and marking every model as text-only.
+- Forward VS Code image attachments to vision-capable models as OpenAI-compatible image inputs.
+
 ## 0.1.2
 
 - The model list no longer waits indefinitely when the public catalog on modelflare.dev is slow or unreachable (for example from the China base URL): the catalog request now times out after 8 seconds and the key's own model list is used.

@@ -4,6 +4,7 @@ import {
   SMART_KEY_HINT,
   describeError,
   isModelflareError,
+  resolveModelProfile,
   signUpUrl,
   streamChatCompletion,
   type ClassifiedModel,
@@ -17,10 +18,9 @@ const ATTRIBUTION_PLUGIN = 'modelflare-vscode'
 const UTM_SOURCE = 'vscode'
 const VERSION = __MODELFLARE_PLUGIN_VERSION__
 
-// Modelflare does not publish per-model context limits; these are the budget
-// VS Code uses when it trims a conversation.
-const MAX_INPUT_TOKENS = 128_000
-const MAX_OUTPUT_TOKENS = 16_384
+const IMAGE_TOKEN_ESTIMATE = 1_024
+
+const SUPPORTED_IMAGE_MIME_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp'])
 
 const locale: Locale = vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 
@@ -47,9 +47,41 @@ interface ModelflareChatInformation extends vscode.LanguageModelChatInformation 
   readonly modelId: string
 }
 
+interface LanguageModelDataLike {
+  readonly data: Uint8Array
+  readonly mimeType: string
+}
+
+interface ChatTextContent {
+  type: 'text'
+  text: string
+}
+
+interface ChatImageContent {
+  type: 'image_url'
+  image_url: { url: string }
+}
+
+type ChatContent = ChatTextContent | ChatImageContent
+
 type ChatMessage =
-  | { role: 'user' | 'assistant' | 'system'; content: string | null; tool_calls?: unknown[] }
+  | { role: 'user' | 'assistant' | 'system'; content: string | ChatContent[] | null; tool_calls?: unknown[] }
   | { role: 'tool'; tool_call_id: string; content: string }
+
+function isLanguageModelDataPart(part: unknown): part is LanguageModelDataLike {
+  if (typeof part !== 'object' || part === null) return false
+  const candidate = part as { data?: unknown; mimeType?: unknown }
+  return candidate.data instanceof Uint8Array && typeof candidate.mimeType === 'string'
+}
+
+function imageContent(part: LanguageModelDataLike): ChatImageContent {
+  const mimeType = part.mimeType.toLowerCase()
+  if (!SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw new TypeError(`Unsupported image type: ${part.mimeType}. Use PNG, JPEG, WEBP, or GIF.`)
+  }
+  const encoded = Buffer.from(part.data.buffer, part.data.byteOffset, part.data.byteLength).toString('base64')
+  return { type: 'image_url', image_url: { url: `data:${mimeType};base64,${encoded}` } }
+}
 
 function textOf(parts: ReadonlyArray<unknown>): string {
   return parts
@@ -61,25 +93,30 @@ function toOpenAIMessages(messages: readonly vscode.LanguageModelChatRequestMess
   const result: ChatMessage[] = []
   for (const message of messages) {
     const role = message.role === vscode.LanguageModelChatMessageRole.Assistant ? 'assistant' : 'user'
-    let text = ''
+    const content: ChatContent[] = []
     const toolCalls: unknown[] = []
     for (const part of message.content) {
       if (part instanceof vscode.LanguageModelTextPart) {
-        text += part.value
+        content.push({ type: 'text', text: part.value })
+      } else if (isLanguageModelDataPart(part) && part.mimeType.toLowerCase().startsWith('image/')) {
+        content.push(imageContent(part))
       } else if (part instanceof vscode.LanguageModelToolCallPart) {
         toolCalls.push({ id: part.callId, type: 'function', function: { name: part.name, arguments: JSON.stringify(part.input) } })
       } else if (part instanceof vscode.LanguageModelToolResultPart) {
         result.push({ role: 'tool', tool_call_id: part.callId, content: textOf(part.content) })
       }
     }
-    if (text || toolCalls.length > 0) {
-      result.push({ role, content: text || null, ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) })
+    if (content.length > 0 || toolCalls.length > 0) {
+      const hasImage = content.some((part) => part.type === 'image_url')
+      const messageContent = hasImage ? content : content.map((part) => (part as ChatTextContent).text).join('') || null
+      result.push({ role, content: messageContent, ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) })
     }
   }
   return result
 }
 
 function toInformation(model: ClassifiedModel): ModelflareChatInformation {
+  const profile = model.profile ?? resolveModelProfile(model.id)
   return {
     id: model.id,
     modelId: model.id,
@@ -88,9 +125,9 @@ function toInformation(model: ClassifiedModel): ModelflareChatInformation {
     version: '1',
     detail: 'Modelflare',
     tooltip: `${model.id} via Modelflare`,
-    maxInputTokens: MAX_INPUT_TOKENS,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    capabilities: { toolCalling: true, imageInput: false },
+    maxInputTokens: profile.maxInputTokens,
+    maxOutputTokens: profile.maxOutputTokens,
+    capabilities: { toolCalling: profile.toolCalling, imageInput: profile.inputModalities.includes('image') },
   }
 }
 
@@ -114,7 +151,7 @@ class ModelflareChatProvider implements vscode.LanguageModelChatProvider<Modelfl
     if (!apiKey) return undefined
     const baseUrl = vscode.workspace.getConfiguration('modelflare').get<string>('baseUrl') || 'global'
     this.#client = new ModelflareClient({ apiKey, baseUrl, plugin: ATTRIBUTION_PLUGIN, version: VERSION })
-    this.#directory = new ModelDirectory({ client: this.#client })
+    this.#directory = new ModelDirectory({ client: this.#client, includeProfiles: true })
     return { client: this.#client, directory: this.#directory }
   }
 
@@ -168,7 +205,7 @@ class ModelflareChatProvider implements vscode.LanguageModelChatProvider<Modelfl
         {
           model: model.modelId,
           messages: toOpenAIMessages(messages),
-          max_tokens: MAX_OUTPUT_TOKENS,
+          max_tokens: model.maxOutputTokens,
           ...(tools.length > 0
             ? { tools, tool_choice: options.toolMode === vscode.LanguageModelChatToolMode.Required ? 'required' : 'auto' }
             : {}),
@@ -201,8 +238,12 @@ class ModelflareChatProvider implements vscode.LanguageModelChatProvider<Modelfl
     text: string | vscode.LanguageModelChatRequestMessage,
   ): Promise<number> {
     const value = typeof text === 'string' ? text : textOf(text.content)
+    const images =
+      typeof text === 'string'
+        ? 0
+        : text.content.filter((part) => isLanguageModelDataPart(part) && part.mimeType.toLowerCase().startsWith('image/')).length
     // Rough estimate; Modelflare bills from the upstream usage, not from this.
-    return Math.ceil(value.length / 4)
+    return Math.ceil(value.length / 4) + images * IMAGE_TOKEN_ESTIMATE
   }
 
   async #describe(error: unknown, modelId?: string): Promise<string> {

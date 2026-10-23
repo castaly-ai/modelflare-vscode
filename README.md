@@ -24,7 +24,9 @@ Use every model available to your Modelflare **Smart API Key** — GPT, Claude, 
 
 ## Features / 功能
 
-- Text models available to your key, loaded from `GET /v1/models`; new models appear without editing the key. Run **Modelflare: Refresh Modelflare Models** to reload.
+- Text models available to your key, loaded from `GET /v1/models?scope=authorized`; new models appear without editing the key. Run **Modelflare: Refresh Modelflare Models** to reload.
+- Per-model context limits, output limits, tool calling, and vision capabilities from Modelflare's authenticated profile endpoint; the key is not sent to a third-party metadata service.
+- Image attachments for vision-capable models (PNG, JPEG, WEBP, and GIF) are forwarded through the OpenAI-compatible chat endpoint.
 - Streaming responses and tool calling for agent mode.
 - Routing across groups, fallback and the routing strategy are handled by the Smart API Key on the server.
 - Requests are billed by the group that served them; see the usage logs at https://modelflare.dev/usage-logs.

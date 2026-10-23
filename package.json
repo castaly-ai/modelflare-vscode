@@ -2,7 +2,7 @@
   "name": "modelflare-vscode",
   "displayName": "Modelflare",
   "description": "Use every model available to your Modelflare Smart API Key in VS Code chat: GPT, Claude, Gemini and more.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "modelflare",
   "license": "MIT",
   "author": "Havenbyte LLC",
